@@ -33,6 +33,6 @@
 
 CMakeCache.txt
 Makefile
-./example
+example
 cmake_install.cmake
 CMakeFiles
