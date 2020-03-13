@@ -8,3 +8,6 @@ cmake .
 make
 ./example
 ```
+
+### Paper
+I wrote small paper to show the derivations. You can find it [here](https://janhuenermann.com/paper/spline2020.pdf).
