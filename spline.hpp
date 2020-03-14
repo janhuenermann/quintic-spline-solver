@@ -14,7 +14,7 @@ struct Spline1
 {
     double coeffs[6];
 
-    double interpolate(double t) const; 
+    double interpolate(double t) const;
     double derivative(double t) const;
 
     static Spline1 calculate(const double *a, const double *b);
@@ -72,7 +72,7 @@ struct SplinePath
 
 template<unsigned int Dims>
 class SplineSolver
-{    
+{
 public:
 
     typedef Matrix<double, Dims, 1> VectorNd;

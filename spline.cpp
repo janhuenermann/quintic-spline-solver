@@ -14,7 +14,7 @@ double Spline1::interpolate(double t) const
 
     return coeffs[0] + coeffs[1] * t1 + coeffs[2] * t2 + coeffs[3] * t3 + coeffs[4] * t4 + coeffs[5] * t5;
 }
- 
+
 double Spline1::derivative(double t) const
 {
     const double t1 = t;
@@ -75,7 +75,7 @@ Spline<Dims> Spline<Dims>::calculate(Matrix<double, Dims, 3, RowMajor> A, Matrix
     {
         out._dims[k] = Spline1::calculate(dataA + 3 * k, dataB + 3 * k);
     }
-    
+
     out.calculateLength();
 
     return out;
