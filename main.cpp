@@ -19,6 +19,8 @@ Mat3f base(1080, 1920);
 vector<Vector2d> points;
 SplineSolver<2> solver;
 SplinePath<2> path;
+
+Vector2i last_click_point;
 chrono::time_point<std::chrono::steady_clock> last_click_time;
 
 SplinePath<2> fit_spline()
@@ -33,7 +35,7 @@ SplinePath<2> fit_spline()
 
 void click_callback(int event, int x, int y, int flags, void* userdata)
 {
-    if (flags != (EVENT_FLAG_CTRLKEY + EVENT_FLAG_LBUTTON))
+    if (flags != (EVENT_FLAG_CTRLKEY | EVENT_FLAG_LBUTTON))
     {
         return ;
     }
@@ -42,12 +44,12 @@ void click_callback(int event, int x, int y, int flags, void* userdata)
     std::chrono::duration<double> diff = std::chrono::steady_clock::now() - last_click_time;
 
     // Debounce
-    if (diff.count() < 0.02)
+    if (last_click_point == click_point || diff.count() < 0.05)
     {
         return ;
     }
 
-    last_click_time = std::chrono::steady_clock::now();
+
     base.setTo(Scalar(0.0f,0.0f, 0.0f)); // clear frame
 
     cout << "Left mouse button is clicked while pressing CTRL key - position (" << x << ", " << y << ")" << endl;
@@ -65,6 +67,9 @@ void click_callback(int event, int x, int y, int flags, void* userdata)
 
     base.copyTo(frame);
     imshow(WINDOW1, frame);
+    
+    last_click_time = std::chrono::steady_clock::now();
+    last_click_point = click_point;
 }
 
 int main(int argc, char **argv)
