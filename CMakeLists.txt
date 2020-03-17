@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(INSTALL_DIR ${CMAKE_SOURCE_DIR}/bin)
 
 # set the project name
-project(quintic_solver)
+project(spline_solver)
 
 # Use OpenCV and Eigen
 find_package(OpenCV REQUIRED)
