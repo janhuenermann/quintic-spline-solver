@@ -17,7 +17,8 @@ using namespace Eigen;
 template<unsigned int Order>
 struct UnitBoundedPolynomial1
 {
-    static_assert(Order > 1);
+    static_assert(Order % 2 == 1, "Order must be odd");
+    static_assert(Order > 0);
 
     /**
      * The number of derivates (including 0-th derivative) 
