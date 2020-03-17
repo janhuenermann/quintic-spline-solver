@@ -372,6 +372,85 @@ bool SplineSolver<5, Dims>::build_solver(const int N, const int M)
     return true;
 }
 
+
+template<unsigned int Dims>
+bool SplineSolver<3, Dims>::find_params_1d(typename SplineSolver<3, Dims>::RowXpr params[2])
+{
+    RowXpr &q = params[0];
+    RowXpr &v = params[1];
+
+    assert(q.cols() > 2);
+    const int N = q.cols();
+    const int M = N-2;
+
+    // Assemble b vector
+    VectorXd b(M);
+    for (int k = 0; k<N-2; ++k)
+    {
+        b(k) = 3 * (q(k+2) - q(k));
+    }
+
+    b(0) += -v(0);
+    b(N-2-1) += -v(last);
+
+    // Assemble 2(N-2) matrix
+    if (A.cols() != M)
+    {
+        if (!build_solver(N, M))
+        {
+            cout << "inverse failed" << endl;
+            return false;
+        }
+    }
+
+    VectorXd sol = solver.solve(b);
+
+    if(solver.info()!=Success)
+    {
+        // solving failed
+        cout << "solving failed" << endl;
+        return false;
+    }
+
+    v.segment(1, N-2) = sol;
+
+    return true;
+}
+
+template<unsigned int Dims>
+bool SplineSolver<3, Dims>::build_solver(const int N, const int M)
+{
+    A = SparseMatrix<double>(M, M);
+    A.reserve(VectorXi::Constant(M, 6));
+
+    for (int k = 0; k<N-2; ++k)
+    {
+        A.insert(k, k) = 4;
+
+        if (k > 0)
+        {
+            A.insert(k, k-1) = 1;
+        }
+
+        if (k < N-3)
+        {
+            A.insert(k, k+1) = 1;
+        }
+    }
+
+    A.makeCompressed();
+    solver.compute(A);
+
+    if (solver.info() != Success)
+    {
+        cout << "inverse failed" << endl;
+        return false;
+    }
+
+    return true;
+}
+
+
 #define INSTANTIATE_SPLINE(Order, Dims) \
 template class UnitBoundedPolynomial<Order, Dims>;\
 template class HermiteSpline<Order, Dims>;\
@@ -382,3 +461,7 @@ template class SplineSolver<Order, Dims>;
 INSTANTIATE_SPLINE(5, 1)
 INSTANTIATE_SPLINE(5, 2)
 INSTANTIATE_SPLINE(5, 3)
+
+INSTANTIATE_SPLINE(3, 1)
+INSTANTIATE_SPLINE(3, 2)
+INSTANTIATE_SPLINE(3, 3)

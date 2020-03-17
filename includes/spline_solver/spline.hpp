@@ -166,6 +166,9 @@ template<unsigned int Order, unsigned int Dims>
 class SplineSolver : public BaseSplineSolver<Order, Dims>
 {};
 
+
+// Quintic solver
+
 template<unsigned int Dims>
 class SplineSolver<5, Dims> : public BaseSplineSolver<5, Dims>
 {
@@ -183,9 +186,27 @@ protected:
 
 };
 
-// To be implemented:
-// template <unsigned int Dims>
-// using CubicHermiteSpline = HermiteSpline<3, Dims>;
+// Cubic solver
+
+template<unsigned int Dims>
+class SplineSolver<3, Dims> : public BaseSplineSolver<3, Dims>
+{
+public:
+
+    using RowXpr = typename BaseSplineSolver<3, Dims>::RowXpr;
+
+protected:
+
+    SparseMatrix<double> A;
+    SparseLU<SparseMatrix<double>,  COLAMDOrdering<int>> solver;
+
+    bool find_params_1d(RowXpr params[2]);
+    bool build_solver(const int N, const int M);
+
+};
+
+template <unsigned int Dims>
+using CubicHermiteSpline = HermiteSpline<3, Dims>;
 
 template <unsigned int Dims>
 using QuinticHermiteSpline = HermiteSpline<5, Dims>;
