@@ -13,6 +13,7 @@ using namespace Eigen;
 
 /**
  * A 1D polynomial of type f(t) = a + b t + c t^2 + d t^3 + ... + z t^(order)
+ * that is bounded to the range t in [0; 1].
  */
 template<unsigned int Order>
 struct UnitBoundedPolynomial1
@@ -56,6 +57,9 @@ struct UnitBoundedPolynomial1
     static UnitBoundedPolynomial1<Order> fit(const Matrix<double, RequiredValues, 1> a, const Matrix<double, RequiredValues, 1> b);
 };
 
+/**
+ * A multi dimensional polynomial function. Aggregate of multiple independent 1-dimensional polynomials.
+ */
 template<unsigned int Order, unsigned int Dims>
 struct UnitBoundedPolynomial
 {
@@ -161,6 +165,11 @@ protected:
 
 };
 
+/**
+ * The spline solver class implements methods
+ * to compute a spline given N+1 points
+ * plus start and end point slopes.
+ */
 template<unsigned int Order, unsigned int Dims>
 class SplineSolver : public BaseSplineSolver<Order, Dims>
 {};
