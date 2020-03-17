@@ -16,21 +16,29 @@ Mat3f base(1080, 1920);
 
 #define WINDOW1 "w1"
 
+
 vector<Vector2d> points;
-SplineSolver<2> solver;
-SplinePath<2> path;
+
+QuinticHermiteSpline<2>::Solver solver;
+QuinticHermiteSpline<2> path;
 
 Vector2i last_click_point;
 chrono::time_point<std::chrono::steady_clock> last_click_time;
 
-SplinePath<2> fit_spline()
+QuinticHermiteSpline<2> fit_spline()
 {
     if (points.size() < 3)
     {
-        return SplinePath<2>();
+        return QuinticHermiteSpline<2>();
     }
 
-    return solver.solve(points, Vector2d(0,0), Vector2d(0,0), Vector2d(0,0), Vector2d(0,0));
+    Matrix2d start;
+    Matrix2d end;
+
+    start.setZero();
+    end.setZero();
+
+    return solver.solve(points, start, end);
 }
 
 void click_callback(int event, int x, int y, int flags, void* userdata)
@@ -67,7 +75,7 @@ void click_callback(int event, int x, int y, int flags, void* userdata)
 
     base.copyTo(frame);
     imshow(WINDOW1, frame);
-    
+
     last_click_time = std::chrono::steady_clock::now();
     last_click_point = click_point;
 }

@@ -6,30 +6,66 @@
 using namespace std;
 using namespace Eigen;
 
-double Spline1::interpolate(double t) const
+template<unsigned int Order>
+double UnitBoundedPolynomial1<Order>::interpolate(double t) const
 {
-    const double t1 = t;
-    const double t2 = t * t1;
-    const double t3 = t * t2;
-    const double t4 = t * t3;
-    const double t5 = t * t4;
+    double y = 0.0, tt = 1;
 
-    return coeffs[0] + coeffs[1] * t1 + coeffs[2] * t2 + coeffs[3] * t3 + coeffs[4] * t4 + coeffs[5] * t5;
+    for (int k = 0; k <= Order; ++k)
+    {
+        y += coeffs[k] * tt;
+        tt *= t;
+    }
+
+    return y;
 }
 
-double Spline1::derivative(double t) const
+template<unsigned int Order>
+double UnitBoundedPolynomial1<Order>::derivative(double t) const
 {
-    const double t1 = t;
-    const double t2 = t * t1;
-    const double t3 = t * t2;
-    const double t4 = t * t3;
+    double dy = 0.0, tt = 1;
 
-    return coeffs[1] + 2 * coeffs[2] * t1 + 3 * coeffs[3] * t2 + 4 * coeffs[4] * t3 + 5 * coeffs[5] * t4;
+    for (int k = 1; k <= Order; ++k)
+    {
+        dy += coeffs[k] * tt * (double)k;
+        tt *= t;
+    }
+
+    return dy;
 }
 
-Spline1 Spline1::calculate(const double *a, const double *b)
+template<unsigned int Order>
+double UnitBoundedPolynomial1<Order>::derivative2(double t) const
 {
-    Spline1 out;
+    double dy = 0.0, tt = 1;
+
+    for (int k = 2; k <= Order; ++k)
+    {
+        dy += coeffs[k] * tt * (double)(k * (k-1));
+        tt *= t;
+    }
+
+    return dy;
+}
+
+template<>
+UnitBoundedPolynomial1<3> UnitBoundedPolynomial1<3>::fit(const Matrix<double, RequiredValues, 1> a, 
+                                                         const Matrix<double, RequiredValues, 1> b)
+{
+    UnitBoundedPolynomial1<3> out;
+    out.coeffs[0] = a[0];
+    out.coeffs[1] = a[1];
+    out.coeffs[2] = -3 * a[0] - 2 * a[1] + 3 * b[0] - 1 * b[1];
+    out.coeffs[3] =  2 * a[0] + 1 * a[1] - 2 * b[0] + 1 * b[1];
+
+    return out;
+}
+
+template<>
+UnitBoundedPolynomial1<5> UnitBoundedPolynomial1<5>::fit(const Matrix<double, RequiredValues, 1> a, 
+                                                         const Matrix<double, RequiredValues, 1> b)
+{
+    UnitBoundedPolynomial1<5> out;
     out.coeffs[0] = a[0];
     out.coeffs[1] = a[1];
     out.coeffs[2] = 0.5 * a[2];
@@ -40,8 +76,8 @@ Spline1 Spline1::calculate(const double *a, const double *b)
     return out;
 }
 
-template<unsigned int Dims>
-typename Spline<Dims>::VectorNd Spline<Dims>::interpolate(double t) const
+template<unsigned int Order, unsigned int Dims>
+typename UnitBoundedPolynomial<Order, Dims>::VectorNd UnitBoundedPolynomial<Order, Dims>::interpolate(double t) const
 {
     VectorNd p;
 
@@ -53,8 +89,8 @@ typename Spline<Dims>::VectorNd Spline<Dims>::interpolate(double t) const
     return p;
 }
 
-template<unsigned int Dims>
-typename Spline<Dims>::VectorNd Spline<Dims>::derivative(double t) const
+template<unsigned int Order, unsigned int Dims>
+typename UnitBoundedPolynomial<Order, Dims>::VectorNd UnitBoundedPolynomial<Order, Dims>::derivative(double t) const
 {
     VectorNd d;
 
@@ -66,11 +102,10 @@ typename Spline<Dims>::VectorNd Spline<Dims>::derivative(double t) const
     return d;
 }
 
-template<unsigned int Dims>
-void Spline<Dims>::walk(const double deltatau, void (*fn)(VectorNd, double, const Spline<Dims>&, void *), void *payload, double a, double b) const
+template<unsigned int Order, unsigned int Dims>
+void UnitBoundedPolynomial<Order, Dims>::walk(const double deltatau, void (*fn)(VectorNd, double, const UnitBoundedPolynomial<Order, Dims>&, void *), void *payload, double a, double b) const
 {
     double tau = a;
-
     while (tau <= b)
     {
         if (b - tau < deltatau)
@@ -84,16 +119,15 @@ void Spline<Dims>::walk(const double deltatau, void (*fn)(VectorNd, double, cons
     }
 }
 
-template<unsigned int Dims>
-Spline<Dims> Spline<Dims>::calculate(Matrix<double, Dims, 3, RowMajor> A, Matrix<double, Dims, 3, RowMajor> B)
+template<unsigned int Order, unsigned int Dims>
+UnitBoundedPolynomial<Order, Dims> UnitBoundedPolynomial<Order, Dims>::fit(Matrix<double, Dims, Poly1::RequiredValues> A, 
+                                                                           Matrix<double, Dims, Poly1::RequiredValues> B)
 {
-    Spline<Dims> out;
-    const double *dataA = &A(0);
-    const double *dataB = &B(0);
+    UnitBoundedPolynomial<Order, Dims> out;
 
     for (int k = 0; k < Dims; ++k)
     {
-        out._dims[k] = Spline1::calculate(dataA + 3 * k, dataB + 3 * k);
+        out._dims[k] = Poly1::fit(A.row(k).transpose(), B.row(k).transpose());
     }
 
     out.calculateLength();
@@ -101,10 +135,10 @@ Spline<Dims> Spline<Dims>::calculate(Matrix<double, Dims, 3, RowMajor> A, Matrix
     return out;
 }
 
-template<unsigned int Dims>
-void Spline<Dims>::calculateLength()
+template<unsigned int Order, unsigned int Dims>
+void UnitBoundedPolynomial<Order, Dims>::calculateLength()
 {
-    // 7-point Gauss-Quadrature for solving length integral
+    // N-point Gauss-Quadrature for solving length integral
     length = 0.0;
 
     for (auto &c : GAUSS_LENGENDRE_COEFFICIENTS)
@@ -115,8 +149,8 @@ void Spline<Dims>::calculateLength()
     length *= 0.5;
 }
 
-template<unsigned int Dims>
-typename SplinePath<Dims>::VectorNd SplinePath<Dims>::interpolate(double s)
+template<unsigned int Order, unsigned int Dims>
+typename HermiteSpline<Order, Dims>::VectorNd HermiteSpline<Order, Dims>::interpolate(double s)
 {
     int m = 0;
     double s_ = s;
@@ -134,8 +168,8 @@ typename SplinePath<Dims>::VectorNd SplinePath<Dims>::interpolate(double s)
     return children[m].interpolate(s_ / children[m].length);
 }
 
-template<unsigned int Dims>
-void SplinePath<Dims>::walk(const double deltatau, void (*fn)(VectorNd, SplinePath<Dims>&, double, Spline<Dims>&, void *), void *payload)
+template<unsigned int Order, unsigned int Dims>
+void HermiteSpline<Order, Dims>::walk(const double deltatau, void (*fn)(VectorNd, HermiteSpline<Order, Dims>&, double, UnitBoundedPolynomial<Order, Dims>&, void *), void *payload)
 {
     double tau = 0.0;
     int m = 0;
@@ -156,35 +190,33 @@ void SplinePath<Dims>::walk(const double deltatau, void (*fn)(VectorNd, SplinePa
     }
 }
 
-template<unsigned int Dims>
-void SplinePath<Dims>::add(Spline<Dims> sp)
+template<unsigned int Order, unsigned int Dims>
+void HermiteSpline<Order, Dims>::add(UnitBoundedPolynomial<Order, Dims> sp)
 {
     children.push_back(sp);
     length += sp.length;
 }
 
-template<unsigned int Dims>
-SplinePath<Dims> SplinePath<Dims>::calculate(MatrixNXd q, MatrixNXd v, MatrixNXd a)
+template<unsigned int Order, unsigned int Dims>
+HermiteSpline<Order, Dims> HermiteSpline<Order, Dims>::fit(array<MatrixNXd, Polynomial1::RequiredValues> values)
 {
-    const int N = q.cols()-1;
-    SplinePath<Dims> result;
+    const int N = values[0].cols()-1; // number of splines
+    HermiteSpline<Order, Dims> result;
 
-    assert(q.cols() == N+1 && v.cols() == N+1 && a.cols() == N+1);
+    Matrix<double, Dims, Polynomial1::RequiredValues, RowMajor> A;
+    Matrix<double, Dims, Polynomial1::RequiredValues, RowMajor> B;
 
-    Matrix<double, Dims, 3, RowMajor> A;
-    Matrix<double, Dims, 3, RowMajor> B;
-
-    A.col(0) = q.col(0);
-    A.col(1) = v.col(0);
-    A.col(2) = a.col(0);
-
-    for (int k = 0; k < N; ++k)
+    for (int k = -1; k < N; ++k)
     {
-        B.col(0) = q.col(k+1);
-        B.col(1) = v.col(k+1);
-        B.col(2) = a.col(k+1);
+        for (int j = 0; j < Polynomial1::RequiredValues; ++j)
+        {
+            B.col(j) = values[j].col(k+1);
+        }
 
-        result.add(Spline<Dims>::calculate(A, B));
+        if (k >= 0)
+        {
+            result.add(UnitBoundedPolynomial<Order, Dims>::fit(A, B));
+        }
 
         A = B;
     }
@@ -194,88 +226,69 @@ SplinePath<Dims> SplinePath<Dims>::calculate(MatrixNXd q, MatrixNXd v, MatrixNXd
 
 #define last N-1
 
-template<unsigned int Dims>
-SplinePath<Dims> SplineSolver<Dims>::solve(vector<VectorNd> points, VectorNd vel_start, VectorNd vel_end, VectorNd accel_start, VectorNd accel_end)
+template<unsigned int Order, unsigned int Dims>
+HermiteSpline<Order, Dims> BaseSplineSolver<Order, Dims>::solve(vector<VectorNd> points, 
+                                                                Matrix<double, Dims, Polynomial1::RequiredValues - 1> start, 
+                                                                Matrix<double, Dims, Polynomial1::RequiredValues - 1> end)
 {
     const int N = points.size();
-    Matrix<double, Dims, Dynamic, RowMajor> q(Dims, N);
-    for (int j = 0; j < points.size(); ++j)
+    // one polynomial per dimension, we go over each dimension one by one
+    // values[0] ^= point value
+    // values[1] ^= 1st derivative
+    // values[2] ^= 2nd derivative
+    // ...
+    array<MatrixNXd, Polynomial1::RequiredValues> values;
+
+    // copy values into temp matrix
+    for (int j = 0; j < Polynomial1::RequiredValues; ++j)
     {
-        q.col(j) = points[j];
+        values[j] = MatrixNXd(Dims, N);
+
+        if (j > 0)
+        {
+            values[j].col(0) = start.col(j-1);
+            values[j].col(last) = end.col(j-1);
+        }
     }
 
-    Matrix<double, Dims, Dynamic, RowMajor> v(Dims, N), a(Dims, N);
-    VectorXd vv(N), va(N);
+    // set values
+    for (int j = 0; j < N; ++j)
+    {
+        values[0].col(j) = points[j];
+    }
+
+    RowXpr *params = (RowXpr *)malloc(Polynomial1::RequiredValues * sizeof(RowXpr));
 
     for (int k = 0; k < Dims; ++k)
     {
-        vv.setZero();
-        va.setZero();
-
-        vv(0) = vel_start(k);
-        vv(last) = vel_end(k);
-        va(0) = accel_start(k);
-        va(last) = accel_end(k);
-
-        if (!find_params_1d(q.row(k).transpose(), vv, va))
+        for (int j = 0; j < Polynomial1::RequiredValues; ++j)
         {
-            return SplinePath<Dims>();
+            RowXpr row = values[j].row(k);
+            memmove(&params[j], &row, sizeof(RowXpr));
         }
 
-        // copy values
-        v.row(k) = vv;
-        a.row(k) = va;
-    }
-
-    return SplinePath<Dims>::calculate(q, v, a);
-}
-
-template<unsigned int Dims>
-bool SplineSolver<Dims>::find_params_1d(VectorXd q, VectorXd &v, VectorXd &a)
-{
-    if (q.rows() > max_n)
-    {
-        const int N = q.rows();
-
-        for (int k = 0; k <= N - max_n; k++)
+        if (!find_params_1d(params))
         {
-            int l;
-            // from start
-            if (k % 2 == 0)
-            {
-                l = k / 2;
-            }
-            // from end
-            else
-            {
-                l = N - max_n - (k-1) / 2;
-            }
-
-            VectorXd vseg = v.segment(l, max_n);
-            VectorXd aseg = a.segment(l, max_n);
-
-            if (!find_params_1d_n(q.segment(l, max_n), vseg, aseg))
-            {
-                return false;
-            }
-
-            v.segment(l, max_n) = vseg;
-            a.segment(l, max_n) = aseg;
+            return HermiteSpline<Order, Dims>();
         }
+    }
 
-        return true;
-    }
-    else
-    {
-        return find_params_1d_n(q, v, a);
-    }
+    free(params);
+
+    return HermiteSpline<Order, Dims>::fit(values);
 }
 
+#define last N-1
+
 template<unsigned int Dims>
-bool SplineSolver<Dims>::find_params_1d_n(VectorXd q, VectorXd &v, VectorXd &a)
+bool SplineSolver<5, Dims>::find_params_1d(typename SplineSolver<5, Dims>::RowXpr params[3])
 {
-    assert(q.rows() > 2);
-    const int N = q.rows();
+    RowXpr &q = params[0];
+    RowXpr &v = params[1];
+    RowXpr &a = params[2];
+
+    assert(q.cols() > 2);
+    const int N = q.cols();
     const int M = 2*(N-2);
 
     // Assemble b vector
@@ -293,7 +306,7 @@ bool SplineSolver<Dims>::find_params_1d_n(VectorXd q, VectorXd &v, VectorXd &a)
     b(2*(N-2)-1) += 8*v(last) - a(last);
 
     // Assemble 2(N-2) matrix
-    if (A.rows() != M)
+    if (A.cols() != M)
     {
         if (!build_solver(N, M))
         {
@@ -318,7 +331,7 @@ bool SplineSolver<Dims>::find_params_1d_n(VectorXd q, VectorXd &v, VectorXd &a)
 }
 
 template<unsigned int Dims>
-bool SplineSolver<Dims>::build_solver(const int N, const int M)
+bool SplineSolver<5, Dims>::build_solver(const int N, const int M)
 {
     A = SparseMatrix<double>(M, M);
     A.reserve(VectorXi::Constant(M, 6));
@@ -359,15 +372,13 @@ bool SplineSolver<Dims>::build_solver(const int N, const int M)
     return true;
 }
 
-template class Spline<1>;
-template class SplinePath<1>;
-template class SplineSolver<1>;
+#define INSTANTIATE_SPLINE(Order, Dims) \
+template class UnitBoundedPolynomial<Order, Dims>;\
+template class HermiteSpline<Order, Dims>;\
+template class BaseSplineSolver<Order, Dims>;\
+template class SplineSolver<Order, Dims>;
 
-template class Spline<2>;
-template class SplinePath<2>;
-template class SplineSolver<2>;
 
-template class Spline<3>;
-template class SplinePath<3>;
-template class SplineSolver<3>;
-
+INSTANTIATE_SPLINE(5, 1)
+INSTANTIATE_SPLINE(5, 2)
+INSTANTIATE_SPLINE(5, 3)

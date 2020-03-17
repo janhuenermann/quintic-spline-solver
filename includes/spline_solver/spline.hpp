@@ -1,6 +1,9 @@
 #ifndef SPLINE_HPP
 #define SPLINE_HPP
 
+#include <array>
+
+#include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/SparseQR>
@@ -8,32 +11,75 @@
 using namespace std;
 using namespace Eigen;
 
-struct Spline1
+/**
+ * A 1D polynomial of type f(t) = a + b t + c t^2 + d t^3 + ... + z t^(order)
+ */
+template<unsigned int Order>
+struct UnitBoundedPolynomial1
 {
-    double coeffs[6];
+    static_assert(Order > 1);
 
+    /**
+     * The number of derivates (including 0-th derivative) 
+     * required to fit this polynomial to start and end point
+     */
+    static constexpr const int RequiredValues = (Order + 1) / 2;
+
+    double coeffs[Order+1];
+
+    /**
+     * Returns point at t on polynomial
+     * @param  t in [0;1]
+     * @return   double
+     */
     double interpolate(double t) const;
+
+    /**
+     * Returns first derivative of polynomial at t
+     * @param  t in [0;1]
+     * @return   double
+     */
     double derivative(double t) const;
 
-    static Spline1 calculate(const double *a, const double *b);
+    /**
+     * Returns second derivative of polynomial at t
+     * @param  t in [0;1]
+     * @return   double
+     */
+    double derivative2(double t) const;
+
+    /**
+     * Fits the polynomial to go through start and end point
+     * with specified derivatives.
+     */
+    static UnitBoundedPolynomial1<Order> fit(const Matrix<double, RequiredValues, 1> a, const Matrix<double, RequiredValues, 1> b);
 };
 
-
-/**
- * A quintic hermite spline
- */
-template<unsigned int Dims>
-struct Spline
+template<unsigned int Order, unsigned int Dims>
+struct UnitBoundedPolynomial
 {
-    typedef Matrix<double, Dims, 1> VectorNd;
+    static_assert(Order > 0);
+    static_assert(Dims > 0);
 
-    Spline1 _dims[Dims];
+    typedef Matrix<double, Dims, 1> VectorNd;
+    typedef UnitBoundedPolynomial1<Order> Poly1;
+
+    UnitBoundedPolynomial1<Order> _dims[Dims];
     double length;
 
     VectorNd interpolate(double t) const;
     VectorNd derivative(double t) const;
 
-    void walk(const double deltatau, void (*fn)(VectorNd, double, const Spline<Dims>&, void *), void *payload = nullptr, double a = 0.0, double b = 1.0) const;
+    /**
+     * Walks on the polynomial. Calls fn many times with points on the function.
+     * Resolution is specified using deltatau.
+     * @param deltatau  Resolution with which to walk 
+     * @param fn        Callback function
+     * @param payload   Gets passed to callback
+     * @param a         Optional, start point, can be used for extrapolation
+     * @param b         Optional, end point, can be used for extrapolation
+     */
+    void walk(const double deltatau, void (*fn)(VectorNd, double, const UnitBoundedPolynomial<Order, Dims>&, void *), void *payload = nullptr, double a = 0.0, double b = 1.0) const;
 
     /**
      * Calculates a spline.
@@ -41,52 +87,107 @@ struct Spline
      * @param  B Matrix of point b with B[:, 0] = point, B[:, 1] = 1st derivative, B[:, 2] = 2nd derivative
      * @return   Spline
      */
-    static Spline calculate(Matrix<double, Dims, 3, RowMajor> A, Matrix<double, Dims, 3, RowMajor> B);
+    static UnitBoundedPolynomial<Order, Dims> fit(Matrix<double, Dims, Poly1::RequiredValues> A, 
+                                                  Matrix<double, Dims, Poly1::RequiredValues> B);
 
 private:
     void calculateLength();
 };
 
-template<unsigned int Dims>
-struct SplinePath
+template<unsigned int Order, unsigned int Dims>
+class SplineSolver;
+
+/**
+ * A hermite spline. 
+ * Order and dimensionality can vary. 
+ * Currently only quintic splines are supported.
+ */
+template<unsigned int Order, unsigned int Dims>
+struct HermiteSpline
 {
+    static_assert(Order > 0);
+    static_assert(Dims > 0);
+
+    using Solver = SplineSolver<Order, Dims>;
+
     typedef Matrix<double, Dims, 1> VectorNd;
     typedef Matrix<double, Dims, Dynamic> MatrixNXd;
 
-    vector<Spline<Dims>> children;
+    typedef UnitBoundedPolynomial1<Order> Polynomial1;
+    typedef UnitBoundedPolynomial<Order, Dims> Polynomial;
+
+    vector<Polynomial> children;
     double length;
 
-    SplinePath() : length(0)
-    {}
+    HermiteSpline() : length(0)
+    {
+    }
 
     VectorNd interpolate(double s);
 
-    void walk(const double deltatau, void (*fn)(VectorNd, SplinePath<Dims>&, double, Spline<Dims>&, void *), void *payload = nullptr);
-    void add(Spline<Dims> sp);
+    void walk(const double deltatau, void (*fn)(VectorNd, HermiteSpline<Order, Dims>&, double, Polynomial&, void *), void *payload = nullptr);
+    void add(Polynomial sp);
 
-    static SplinePath<Dims> calculate(MatrixNXd q, MatrixNXd v, MatrixNXd a);
+    /**
+     * Calculates the hermite spline.
+     * @param values    An array of required values (i.e. point, derivative, 2nd derivative, ..) x dimensions x number of points.
+     * @return HermiteSpline
+     */
+    static HermiteSpline<Order, Dims> fit(array<MatrixNXd, Polynomial1::RequiredValues> values);
 };
 
-#define last N-1
-
-template<unsigned int Dims>
-class SplineSolver
+template<unsigned int Order, unsigned int Dims>
+class BaseSplineSolver
 {
 public:
 
-    typedef Matrix<double, Dims, 1> VectorNd;
+    const int MaxN = 64;
 
-    SplinePath<Dims> solve(vector<VectorNd> points, VectorNd vel_start, VectorNd vel_end, VectorNd accel_start, VectorNd accel_end);
+    typedef typename Eigen::Matrix<double, Dims, 1> VectorNd;
+    typedef typename Eigen::Matrix<double, Dims, Dynamic> MatrixNXd;
+    typedef typename MatrixNXd::RowXpr RowXpr;
 
-private:
-    int max_n = 64;
+    typedef UnitBoundedPolynomial1<Order> Polynomial1;
+    typedef UnitBoundedPolynomial<Order, Dims> Polynomial;
+
+    typedef HermiteSpline<Order, Dims> Spline;
+
+    HermiteSpline<Order, Dims> solve(vector<VectorNd> points, 
+                                     Matrix<double, Dims, Polynomial1::RequiredValues - 1> start, 
+                                     Matrix<double, Dims, Polynomial1::RequiredValues - 1> end);
+
+protected:
+
+    virtual bool find_params_1d(RowXpr params[Polynomial1::RequiredValues]) = 0;
+
+};
+
+template<unsigned int Order, unsigned int Dims>
+class SplineSolver : public BaseSplineSolver<Order, Dims>
+{};
+
+template<unsigned int Dims>
+class SplineSolver<5, Dims> : public BaseSplineSolver<5, Dims>
+{
+public:
+
+    using RowXpr = typename BaseSplineSolver<5, Dims>::RowXpr;
+
+protected:
+
     SparseMatrix<double> A;
-    SparseLU<SparseMatrix<double>,  Eigen::COLAMDOrdering<int>> solver;
+    SparseLU<SparseMatrix<double>,  COLAMDOrdering<int>> solver;
 
-    bool find_params_1d(VectorXd q, VectorXd &v, VectorXd &a);
-    bool find_params_1d_n(VectorXd q, VectorXd &v, VectorXd &a);
+    bool find_params_1d(RowXpr params[3]);
     bool build_solver(const int N, const int M);
 
 };
+
+// To be implemented:
+// template <unsigned int Dims>
+// using CubicHermiteSpline = HermiteSpline<3, Dims>;
+
+template <unsigned int Dims>
+using QuinticHermiteSpline = HermiteSpline<5, Dims>;
 
 #endif

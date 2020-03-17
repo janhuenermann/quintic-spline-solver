@@ -11,7 +11,8 @@ using namespace cv;
 struct _drawSplinePayload { Mat3f &img; Vector2d &scale; };
 
 // gets called for every point
-inline void draw_spline_callback(Vector2d pt, SplinePath<2>& path, double tau, Spline<2>& sp, void *payload)
+template<unsigned int Order>
+inline void draw_spline_callback(Vector2d pt, HermiteSpline<Order, 2>& path, double tau, UnitBoundedPolynomial<Order, 2>& sp, void *payload)
 {
     _drawSplinePayload *payl = reinterpret_cast<_drawSplinePayload *>(payload);
 
@@ -26,7 +27,8 @@ inline void draw_spline_callback(Vector2d pt, SplinePath<2>& path, double tau, S
  * @param img   Image
  * @param scale Resizes spline by given factor
  */
-inline void draw_spline(SplinePath<2> path, Mat3f img, Vector2d scale = Vector2d(1,1))
+template<unsigned int Order>
+inline void draw_spline(HermiteSpline<Order, 2> path, Mat3f img, Vector2d scale = Vector2d(1,1))
 {
     const Vector2d size(img.cols, img.rows);
     const double deltatau = 1.0 / scale.norm(); // 1.0 / hypot((double)img.cols, (double)img.rows);
