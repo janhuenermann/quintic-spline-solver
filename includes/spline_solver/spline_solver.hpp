@@ -1,1 +1,1 @@
-#include <spline_solver/spline.hpp>
+#include <spline_solver/hermite_spline.hpp>

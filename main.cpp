@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <chrono>
 
-#include <spline_solver/spline.hpp>
+#include <spline_solver/hermite_spline.hpp>
 #include <spline_solver/draw.hpp>
 
 using namespace std;
@@ -12,33 +12,45 @@ using namespace cv;
 using namespace Eigen;
 
 Mat3f frame(1080, 1920);
-Mat3f base(1080, 1920);
+const double scale = (double)max(frame.cols, frame.rows);
 
 #define WINDOW1 "w1"
 
 
 vector<Vector2d> points;
 
-QuinticHermiteSpline<2>::Solver solver;
-QuinticHermiteSpline<2> path;
-
 Vector2i last_click_point;
 chrono::time_point<std::chrono::steady_clock> last_click_time;
 
-QuinticHermiteSpline<2> fit_spline()
+template<typename Spline>
+Spline fit_and_draw_spline()
 {
-    if (points.size() < 3)
+    Spline sp;
+
+    frame.setTo(Scalar(0.0f,0.0f, 0.0f)); // clear frame
+
+    if (points.size() >= 3)
     {
-        return QuinticHermiteSpline<2>();
+        typename Spline::Solver solver;
+
+        Matrix<double, 2, Spline::Polynomial1::RequiredValues - 1> start;
+        Matrix<double, 2, Spline::Polynomial1::RequiredValues - 1> end;
+
+        start.setZero();
+        end.setZero();
+
+        sp = solver.solve(points, start, end);
+        draw_spline(sp, frame, Vector2d(scale, scale));
     }
 
-    Matrix2d start;
-    Matrix2d end;
+    for (int k = 0; k < points.size(); ++k)
+    {
+        circle(frame, Point((int)(points[k].x() * scale), (int)(points[k].y() * scale)), 5.0, Scalar(0.0f, 1.0f, 0.0f), FILLED);
+    }
 
-    start.setZero();
-    end.setZero();
+    imshow(WINDOW1, frame);
 
-    return solver.solve(points, start, end);
+    return sp;
 }
 
 void click_callback(int event, int x, int y, int flags, void* userdata)
@@ -57,24 +69,10 @@ void click_callback(int event, int x, int y, int flags, void* userdata)
         return ;
     }
 
-
-    base.setTo(Scalar(0.0f,0.0f, 0.0f)); // clear frame
-
     cout << "Left mouse button is clicked while pressing CTRL key - position (" << x << ", " << y << ")" << endl;
 
-    double scale = (double)max(frame.cols, frame.rows);
     points.push_back(click_point.cast<double>() / scale);
-
-    path = fit_spline();
-    draw_spline(path, base, Vector2d(scale, scale));
-
-    for (int k = 0; k < points.size(); ++k)
-    {
-        circle(base, Point((int)(points[k].x() * scale), (int)(points[k].y() * scale)), 5.0, Scalar(0.0f, 1.0f, 0.0f), FILLED);
-    }
-
-    base.copyTo(frame);
-    imshow(WINDOW1, frame);
+    fit_and_draw_spline<QuinticHermiteSpline<2>>();
 
     last_click_time = std::chrono::steady_clock::now();
     last_click_point = click_point;
@@ -88,6 +86,9 @@ int main(int argc, char **argv)
     cout << "Click on a spot with the left mouse button and hold down CTRL to add a point to the spline." << endl;
 
     imshow(WINDOW1, frame);
+    waitKey(0);
+
+    fit_and_draw_spline<CubicHermiteSpline<2>>();
     waitKey(0);
 
     return 0;
