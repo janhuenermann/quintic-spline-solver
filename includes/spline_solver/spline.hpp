@@ -101,7 +101,7 @@ class SplineSolver;
 /**
  * A hermite spline. 
  * Order and dimensionality can vary. 
- * Currently only quintic splines are supported.
+ * Currently only quintic and cubic splines are supported.
  */
 template<unsigned int Order, unsigned int Dims>
 struct HermiteSpline
@@ -141,8 +141,6 @@ template<unsigned int Order, unsigned int Dims>
 class BaseSplineSolver
 {
 public:
-
-    const int MaxN = 64;
 
     typedef typename Eigen::Matrix<double, Dims, 1> VectorNd;
     typedef typename Eigen::Matrix<double, Dims, Dynamic> MatrixNXd;
