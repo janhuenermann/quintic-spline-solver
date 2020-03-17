@@ -36,3 +36,8 @@ Makefile
 example
 cmake_install.cmake
 CMakeFiles
+
+.DS_Store
+
+install_manifest.txt
+bin

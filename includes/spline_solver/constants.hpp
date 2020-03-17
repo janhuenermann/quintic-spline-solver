@@ -1,3 +1,6 @@
+#ifndef CONSTANTS_HPP
+#define CONSTANTS_HPP
+
 #include <Eigen/Dense>
 
 using namespace std;
@@ -71,3 +74,5 @@ const std::vector<Vector2d> GAUSS_LENGENDRE_COEFFICIENTS =
     Vector2d(0.0017832807216964, 0.5*(1.0 + -0.9993050417357722)),
     Vector2d(0.0017832807216964, 0.5*(1.0 + 0.9993050417357722))
 };
+
+#endif

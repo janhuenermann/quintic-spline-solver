@@ -1,8 +1,10 @@
-#include "spline.hpp"
+#include <iostream>
+
+#include <spline_solver/spline.hpp>
+#include <spline_solver/constants.hpp>
 
 using namespace std;
 using namespace Eigen;
-using namespace cv;
 
 double Spline1::interpolate(double t) const
 {
@@ -65,6 +67,24 @@ typename Spline<Dims>::VectorNd Spline<Dims>::derivative(double t) const
 }
 
 template<unsigned int Dims>
+void Spline<Dims>::walk(const double deltatau, void (*fn)(VectorNd, double, const Spline<Dims>&, void *), void *payload, double a, double b) const
+{
+    double tau = a;
+
+    while (tau <= b)
+    {
+        if (b - tau < deltatau)
+        {
+            tau = b;
+        }
+
+        fn(interpolate(tau), tau, *this, payload);
+
+        tau += deltatau;
+    }
+}
+
+template<unsigned int Dims>
 Spline<Dims> Spline<Dims>::calculate(Matrix<double, Dims, 3, RowMajor> A, Matrix<double, Dims, 3, RowMajor> B)
 {
     Spline<Dims> out;
@@ -115,7 +135,7 @@ typename SplinePath<Dims>::VectorNd SplinePath<Dims>::interpolate(double s)
 }
 
 template<unsigned int Dims>
-void SplinePath<Dims>::walk(const double deltatau, void (*fn)(VectorNd, SplinePath<Dims>&, double, Spline<Dims>&))
+void SplinePath<Dims>::walk(const double deltatau, void (*fn)(VectorNd, SplinePath<Dims>&, double, Spline<Dims>&, void *), void *payload)
 {
     double tau = 0.0;
     int m = 0;
@@ -125,36 +145,8 @@ void SplinePath<Dims>::walk(const double deltatau, void (*fn)(VectorNd, SplinePa
         double reltau = tau / children[m].length;
         VectorNd pt = children[m].interpolate(reltau);
 
-        fn(pt, *this, reltau, children[m]);
+        fn(pt, *this, reltau, children[m], payload);
         tau += deltatau;
-
-        if (tau > children[m].length)
-        {
-            tau = 0.0;
-            m++;
-        }
-    }
-}
-
-template<>
-void SplinePath<2>::draw(Mat3f img, Vector2d scale)
-{
-    const VectorNd size(img.cols, img.rows);
-    const double deltatau = 1.0 / scale.norm(); // 1.0 / hypot((double)img.cols, (double)img.rows);
-    double tau = 0.0;
-    int m = 0;
-
-    while (m < children.size())
-    {
-        double reltau = tau / children[m].length;
-        VectorNd pt = children[m].interpolate(reltau).cwiseProduct(scale);
-        int x = floor(pt.x());
-        int y = floor(pt.y());
-
-        circle(img, Point(x, y), 4.0, Scalar(0.0f, 0.0f, 1.0f), FILLED);
-
-        double dnorm = (double)children[m].derivative(reltau).norm();
-        tau += deltatau / std::clamp(dnorm, 0.1, 10.0);
 
         if (tau > children[m].length)
         {
@@ -299,8 +291,6 @@ bool SplineSolver<Dims>::find_params_1d_n(VectorXd q, VectorXd &v, VectorXd &a)
 
     b(N-2) += -8*v(0) - a(0);
     b(2*(N-2)-1) += 8*v(last) - a(last);
-
-    array<VectorXd, 2> result;
 
     // Assemble 2(N-2) matrix
     if (A.rows() != M)

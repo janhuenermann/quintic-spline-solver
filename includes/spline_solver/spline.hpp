@@ -1,14 +1,12 @@
+#ifndef SPLINE_HPP
+#define SPLINE_HPP
+
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/SparseQR>
 
-#include <opencv2/opencv.hpp>
-
-#include "constants.hpp"
-
 using namespace std;
 using namespace Eigen;
-using namespace cv;
 
 struct Spline1
 {
@@ -34,6 +32,8 @@ struct Spline
 
     VectorNd interpolate(double t) const;
     VectorNd derivative(double t) const;
+
+    void walk(const double deltatau, void (*fn)(VectorNd, double, const Spline<Dims>&, void *), void *payload = nullptr, double a = 0.0, double b = 1.0) const;
 
     /**
      * Calculates a spline.
@@ -61,8 +61,7 @@ struct SplinePath
 
     VectorNd interpolate(double s);
 
-    void walk(const double deltatau, void (*fn)(VectorNd, SplinePath<Dims>&, double, Spline<Dims>&));
-    void draw(Mat3f img, Vector2d scale);
+    void walk(const double deltatau, void (*fn)(VectorNd, SplinePath<Dims>&, double, Spline<Dims>&, void *), void *payload = nullptr);
     void add(Spline<Dims> sp);
 
     static SplinePath<Dims> calculate(MatrixNXd q, MatrixNXd v, MatrixNXd a);
@@ -82,10 +81,12 @@ public:
 private:
     int max_n = 64;
     SparseMatrix<double> A;
-    SparseQR<SparseMatrix<double>,  Eigen::COLAMDOrdering<int>> solver;
+    SparseLU<SparseMatrix<double>,  Eigen::COLAMDOrdering<int>> solver;
 
     bool find_params_1d(VectorXd q, VectorXd &v, VectorXd &a);
     bool find_params_1d_n(VectorXd q, VectorXd &v, VectorXd &a);
     bool build_solver(const int N, const int M);
 
 };
+
+#endif

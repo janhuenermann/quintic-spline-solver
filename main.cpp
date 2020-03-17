@@ -4,7 +4,8 @@
 #include <Eigen/Dense>
 #include <chrono>
 
-#include "spline.hpp"
+#include <spline_solver/spline.hpp>
+#include <spline_solver/draw.hpp>
 
 using namespace std;
 using namespace cv;
@@ -15,11 +16,10 @@ Mat3f base(1080, 1920);
 
 #define WINDOW1 "w1"
 
-Vector2i last_click_point;
 vector<Vector2d> points;
 SplineSolver<2> solver;
+SplinePath<2> path;
 chrono::time_point<std::chrono::steady_clock> last_click_time;
-ostringstream pts;
 
 SplinePath<2> fit_spline()
 {
@@ -31,7 +31,7 @@ SplinePath<2> fit_spline()
     return solver.solve(points, Vector2d(0,0), Vector2d(0,0), Vector2d(0,0), Vector2d(0,0));
 }
 
-void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+void click_callback(int event, int x, int y, int flags, void* userdata)
 {
     if (flags != (EVENT_FLAG_CTRLKEY + EVENT_FLAG_LBUTTON))
     {
@@ -42,7 +42,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     std::chrono::duration<double> diff = std::chrono::steady_clock::now() - last_click_time;
 
     // Debounce
-    if (last_click_point == click_point || diff.count() < 0.02)
+    if (diff.count() < 0.02)
     {
         return ;
     }
@@ -55,8 +55,8 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     double scale = (double)max(frame.cols, frame.rows);
     points.push_back(click_point.cast<double>() / scale);
 
-    SplinePath<2> path = fit_spline();
-    path.draw(base, Vector2d(scale, scale));
+    path = fit_spline();
+    draw_spline(path, base, Vector2d(scale, scale));
 
     for (int k = 0; k < points.size(); ++k)
     {
@@ -65,14 +65,12 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 
     base.copyTo(frame);
     imshow(WINDOW1, frame);
-    last_click_point = click_point;
 }
 
 int main(int argc, char **argv)
 {
     namedWindow(WINDOW1, 1);
-    setMouseCallback(WINDOW1, CallBackFunc, NULL);
-    vector<Vector2d> pts;
+    setMouseCallback(WINDOW1, click_callback, NULL);
 
     cout << "Click on a spot with the left mouse button and hold down CTRL to add a point to the spline." << endl;
 
