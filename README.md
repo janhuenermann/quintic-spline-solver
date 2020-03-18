@@ -1,4 +1,5 @@
-## Spline Solver
+![Spline Solver](./images/text.png | width=200)
+
 A spline library that implements arbitrary hermite splines with as many dimensions as you can dream of, and includes solvers for cubic and quinitic hermite splines that ensure C^2 and C^4 continuity. It's written in C++, uses Eigen for fast matrix computations and includes a infancy demo.
 
 ### Paper
